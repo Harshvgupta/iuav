@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>trajectory.optimal_time &#8212; minimum snap 0.0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=039e1c02" />
+    <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js?v=f6245a2f"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=4825356b"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for trajectory.optimal_time</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">nn</span>
+<span class="kn">import</span> <span class="nn">qpth</span>
+<span class="kn">from</span> <span class="nn">qpth.qp</span> <span class="kn">import</span> <span class="n">QPFunction</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+
+<span class="n">torch</span><span class="o">.</span><span class="n">set_printoptions</span><span class="p">(</span><span class="n">precision</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TrajectoryUtils"><a class="viewcode-back" href="../../index.html#trajectory.optimal_time.TrajectoryUtils">[docs]</a><span class="k">class</span> <span class="nc">TrajectoryUtils</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Utility functions for trajectory calculations.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="TrajectoryUtils.calculate_time_vector"><a class="viewcode-back" href="../../index.html#trajectory.optimal_time.TrajectoryUtils.calculate_time_vector">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">calculate_time_vector</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">derivative_order</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates a time vector for polynomial evaluation based on the given time, polynomial order, and derivative order.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            time (float): Scalar time value.</span>
+<span class="sd">            order (int): Order of the polynomial.</span>
+<span class="sd">            derivative_order (int): The order of the derivative.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: A tensor representing the time vector.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">time_vector</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">derivative_order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">order</span> <span class="o">+</span> <span class="mi">2</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">i</span> <span class="o">-</span> <span class="n">derivative_order</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">product</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">i</span> <span class="o">-</span> <span class="n">derivative_order</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">product</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">i</span> <span class="o">-</span> <span class="n">derivative_order</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">))</span>
+            <span class="n">time_vector</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">product</span> <span class="o">*</span> <span class="p">(</span><span class="n">time</span> <span class="o">**</span> <span class="p">(</span><span class="n">i</span> <span class="o">-</span> <span class="n">derivative_order</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">time_vector</span></div>
+
+<div class="viewcode-block" id="TrajectoryUtils.compute_Q_matrix"><a class="viewcode-back" href="../../index.html#trajectory.optimal_time.TrajectoryUtils.compute_Q_matrix">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">compute_Q_matrix</span><span class="p">(</span><span class="n">poly_order</span><span class="p">,</span> <span class="n">derivative_order</span><span class="p">,</span> <span class="n">start_time</span><span class="p">,</span> <span class="n">end_time</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Computes the Q matrix used in the quadratic cost function for polynomial optimization.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            poly_order (int): Order of the polynomial.</span>
+<span class="sd">            derivative_order (int): The order of the derivative.</span>
+<span class="sd">            start_time (float): Start time of the segment.</span>
+<span class="sd">            end_time (float): End time of the segment.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: A tensor representing the Q matrix.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">time_diff_powers</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">poly_order</span> <span class="o">-</span> <span class="n">derivative_order</span><span class="p">)</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">((</span><span class="n">poly_order</span> <span class="o">-</span> <span class="n">derivative_order</span><span class="p">)</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="n">time_diff_powers</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">end_time</span> <span class="o">**</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="n">start_time</span> <span class="o">**</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">Q_matrix</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">poly_order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">poly_order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">derivative_order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">poly_order</span> <span class="o">+</span> <span class="mi">2</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">poly_order</span> <span class="o">+</span> <span class="mi">2</span><span class="p">):</span>
+                <span class="n">k1</span> <span class="o">=</span> <span class="n">i</span> <span class="o">-</span> <span class="n">derivative_order</span> <span class="o">-</span> <span class="mi">1</span>
+                <span class="n">k2</span> <span class="o">=</span> <span class="n">j</span> <span class="o">-</span> <span class="n">derivative_order</span> <span class="o">-</span> <span class="mi">1</span>
+                <span class="n">k</span> <span class="o">=</span> <span class="n">k1</span> <span class="o">+</span> <span class="n">k2</span> <span class="o">+</span> <span class="mi">1</span>
+                <span class="n">prod_k1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">k1</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">k1</span> <span class="o">+</span> <span class="n">derivative_order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">))</span>
+                <span class="n">prod_k2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">k2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">k2</span> <span class="o">+</span> <span class="n">derivative_order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">))</span>
+                <span class="n">Q_matrix</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">j</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">prod_k1</span> <span class="o">*</span> <span class="n">prod_k2</span> <span class="o">/</span> <span class="n">k</span> <span class="o">*</span> <span class="n">time_diff_powers</span><span class="p">[</span><span class="n">k</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+                <span class="n">Q_matrix</span><span class="p">[</span><span class="n">j</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">Q_matrix</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">j</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">Q_matrix</span></div>
+
+<div class="viewcode-block" id="TrajectoryUtils.evaluate_polynomial"><a class="viewcode-back" href="../../index.html#trajectory.optimal_time.TrajectoryUtils.evaluate_polynomial">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">evaluate_polynomial</span><span class="p">(</span><span class="n">polynomial_coefficients</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">derivative_order</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Evaluates a polynomial at a given time for a specific derivative order.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            polynomial_coefficients (torch.Tensor): Coefficients of the polynomial.</span>
+<span class="sd">            time (float): Scalar time value.</span>
+<span class="sd">            derivative_order (int): The order of the derivative.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            float: The evaluated value of the polynomial at the given time.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">polynomial_order</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">polynomial_coefficients</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">derivative_order</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">polynomial_order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="n">value</span> <span class="o">+=</span> <span class="n">polynomial_coefficients</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">time</span> <span class="o">**</span> <span class="n">i</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">derivative_order</span><span class="p">,</span> <span class="n">polynomial_order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="n">value</span> <span class="o">+=</span> <span class="n">polynomial_coefficients</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">i</span> <span class="o">-</span> <span class="n">derivative_order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span> <span class="o">*</span> <span class="n">time</span> <span class="o">**</span> <span class="p">(</span><span class="n">i</span> <span class="o">-</span> <span class="n">derivative_order</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">value</span></div>
+
+<div class="viewcode-block" id="TrajectoryUtils.evaluate_polynomials"><a class="viewcode-back" href="../../index.html#trajectory.optimal_time.TrajectoryUtils.evaluate_polynomials">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">evaluate_polynomials</span><span class="p">(</span><span class="n">polynomial_coefficients</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">,</span> <span class="n">times</span><span class="p">,</span> <span class="n">derivative_order</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Evaluates multiple polynomials over a range of times for a specific derivative order.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            polynomial_coefficients (torch.Tensor): Coefficients of the polynomials.</span>
+<span class="sd">            time_stamps (torch.Tensor): Timestamps for each segment.</span>
+<span class="sd">            times (torch.Tensor): Tensor of times to evaluate the polynomials.</span>
+<span class="sd">            derivative_order (int): The order of the derivative.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: A tensor of evaluated polynomial values.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">num_points</span> <span class="o">=</span> <span class="n">times</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_points</span><span class="p">)</span>
+        <span class="n">index</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_points</span><span class="p">):</span>
+            <span class="n">time</span> <span class="o">=</span> <span class="n">times</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">time</span> <span class="o">&lt;</span> <span class="n">time_stamps</span><span class="p">[</span><span class="n">index</span><span class="p">]:</span>
+                <span class="n">values</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">while</span> <span class="n">index</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">time_stamps</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">time</span> <span class="o">&gt;</span> <span class="n">time_stamps</span><span class="p">[</span><span class="n">index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mf">0.0001</span><span class="p">:</span>
+                    <span class="n">index</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="n">values</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">evaluate_polynomial</span><span class="p">(</span><span class="n">polynomial_coefficients</span><span class="p">[:,</span> <span class="n">index</span><span class="p">],</span> <span class="n">time</span><span class="p">,</span> <span class="n">derivative_order</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">values</span></div></div>
+
+<div class="viewcode-block" id="TrajectoryPlotter"><a class="viewcode-back" href="../../index.html#trajectory.optimal_time.TrajectoryPlotter">[docs]</a><span class="k">class</span> <span class="nc">TrajectoryPlotter</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Class for plotting the trajectory and its derivatives.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="TrajectoryPlotter.plot_trajectory"><a class="viewcode-back" href="../../index.html#trajectory.optimal_time.TrajectoryPlotter.plot_trajectory">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">plot_trajectory</span><span class="p">(</span><span class="n">waypoints</span><span class="p">,</span> <span class="n">polys_x</span><span class="p">,</span> <span class="n">polys_y</span><span class="p">,</span> <span class="n">polys_z</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">,</span> <span class="n">iteration</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">clear_plot</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">flag</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Plot the minimum snap trajectory in 3D.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            waypoints (torch.Tensor): Waypoints in 3D space.</span>
+<span class="sd">            polys_x (torch.Tensor): Polynomial coefficients for x axis.</span>
+<span class="sd">            polys_y (torch.Tensor): Polynomial coefficients for y axis.</span>
+<span class="sd">            polys_z (torch.Tensor): Polynomial coefficients for z axis.</span>
+<span class="sd">            time_stamps (torch.Tensor): Time stamps for each segment.</span>
+<span class="sd">            iteration (int, optional): Current iteration number for optimization.</span>
+<span class="sd">            clear_plot (bool, optional): Whether to clear the plot before plotting.</span>
+<span class="sd">            flag (bool, optional): Whether to display the plot immediately.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">clear_plot</span><span class="p">:</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">clf</span><span class="p">()</span>
+        <span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+        <span class="n">ax</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">111</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="s1">&#39;3d&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Plot waypoints</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">waypoints</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">waypoints</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">waypoints</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">,</span> <span class="n">marker</span><span class="o">=</span><span class="s1">&#39;*&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Plot trajectory in segments</span>
+        <span class="n">colors</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;g&#39;</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">,</span> <span class="s1">&#39;c&#39;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">polys_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="n">times</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">time_stamps</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span> <span class="n">time_stamps</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span> <span class="mf">0.01</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">polys_x</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">polys_x</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="n">x_values</span> <span class="o">=</span> <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">evaluate_polynomials</span><span class="p">(</span><span class="n">polys_x</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">,</span> <span class="n">times</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">y_values</span> <span class="o">=</span> <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">evaluate_polynomials</span><span class="p">(</span><span class="n">polys_y</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">,</span> <span class="n">times</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">z_values</span> <span class="o">=</span> <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">evaluate_polynomials</span><span class="p">(</span><span class="n">polys_z</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">,</span> <span class="n">times</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_values</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">y_values</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">z_values</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">[</span><span class="n">i</span> <span class="o">%</span> <span class="mi">3</span><span class="p">])</span>
+
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;X axis&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Y axis&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_zlabel</span><span class="p">(</span><span class="s1">&#39;Z axis&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;Minimum Snap Trajectory&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">iteration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">text</span><span class="p">(</span><span class="n">waypoints</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">waypoints</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="sa">f</span><span class="s2">&quot;Iteration </span><span class="si">{</span><span class="n">iteration</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">flag</span><span class="p">:</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="TrajectoryPlotter.plot_trajectory_and_derivatives"><a class="viewcode-back" href="../../index.html#trajectory.optimal_time.TrajectoryPlotter.plot_trajectory_and_derivatives">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">plot_trajectory_and_derivatives</span><span class="p">(</span><span class="n">waypoints</span><span class="p">,</span> <span class="n">polys_x</span><span class="p">,</span> <span class="n">polys_y</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Plots the trajectory and its derivatives (position, velocity, acceleration, jerk, and snap).</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            waypoints (torch.Tensor): Waypoints of the trajectory.</span>
+<span class="sd">            polys_x (torch.Tensor): Polynomial coefficients for the x-coordinate.</span>
+<span class="sd">            polys_y (torch.Tensor): Polynomial coefficients for the y-coordinate.</span>
+<span class="sd">            time_stamps (torch.Tensor): Timestamps for each segment.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">TrajectoryPlotter</span><span class="o">.</span><span class="n">plot_trajectory</span><span class="p">(</span><span class="n">waypoints</span><span class="p">,</span> <span class="n">polys_x</span><span class="p">,</span> <span class="n">polys_y</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">polys_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="n">times</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">time_stamps</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span> <span class="n">time_stamps</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span> <span class="mf">0.01</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">polys_x</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">polys_x</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+
+        <span class="n">x_positions</span> <span class="o">=</span> <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">evaluate_polynomials</span><span class="p">(</span><span class="n">polys_x</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">,</span> <span class="n">times</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">y_positions</span> <span class="o">=</span> <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">evaluate_polynomials</span><span class="p">(</span><span class="n">polys_y</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">,</span> <span class="n">times</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">x_velocities</span> <span class="o">=</span> <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">evaluate_polynomials</span><span class="p">(</span><span class="n">polys_x</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">,</span> <span class="n">times</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">y_velocities</span> <span class="o">=</span> <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">evaluate_polynomials</span><span class="p">(</span><span class="n">polys_y</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">,</span> <span class="n">times</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">x_accelerations</span> <span class="o">=</span> <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">evaluate_polynomials</span><span class="p">(</span><span class="n">polys_x</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">,</span> <span class="n">times</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">y_accelerations</span> <span class="o">=</span> <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">evaluate_polynomials</span><span class="p">(</span><span class="n">polys_y</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">,</span> <span class="n">times</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">x_jerks</span> <span class="o">=</span> <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">evaluate_polynomials</span><span class="p">(</span><span class="n">polys_x</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">,</span> <span class="n">times</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+        <span class="n">y_jerks</span> <span class="o">=</span> <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">evaluate_polynomials</span><span class="p">(</span><span class="n">polys_y</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">,</span> <span class="n">times</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+        <span class="n">x_snap</span> <span class="o">=</span> <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">evaluate_polynomials</span><span class="p">(</span><span class="n">polys_x</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">,</span> <span class="n">times</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+        <span class="n">y_snap</span> <span class="o">=</span> <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">evaluate_polynomials</span><span class="p">(</span><span class="n">polys_y</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">,</span> <span class="n">times</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+
+        <span class="n">fig</span><span class="p">,</span> <span class="n">axs</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">16</span><span class="p">))</span>
+        <span class="n">axs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">times</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">x_positions</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
+        <span class="n">axs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;X Position&#39;</span><span class="p">)</span>
+        <span class="n">axs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">times</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">y_positions</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
+        <span class="n">axs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Y Position&#39;</span><span class="p">)</span>
+
+        <span class="n">axs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">times</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">x_velocities</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
+        <span class="n">axs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;X Velocity&#39;</span><span class="p">)</span>
+        <span class="n">axs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">times</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">y_velocities</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
+        <span class="n">axs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Y Velocity&#39;</span><span class="p">)</span>
+
+        <span class="n">axs</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">times</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">x_accelerations</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
+        <span class="n">axs</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;X Acceleration&#39;</span><span class="p">)</span>
+        <span class="n">axs</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">times</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">y_accelerations</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
+        <span class="n">axs</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Y Acceleration&#39;</span><span class="p">)</span>
+
+        <span class="n">axs</span><span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">times</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">x_jerks</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
+        <span class="n">axs</span><span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;X Jerk&#39;</span><span class="p">)</span>
+        <span class="n">axs</span><span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">times</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">y_jerks</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
+        <span class="n">axs</span><span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Y Jerk&#39;</span><span class="p">)</span>
+
+        <span class="n">axs</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">times</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">x_snap</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
+        <span class="n">axs</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;X Snap&#39;</span><span class="p">)</span>
+        <span class="n">axs</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">times</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">y_snap</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
+        <span class="n">axs</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Y Snap&#39;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">ax</span> <span class="ow">in</span> <span class="n">axs</span><span class="o">.</span><span class="n">flat</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">xlabel</span><span class="o">=</span><span class="s1">&#39;Time (s)&#39;</span><span class="p">,</span> <span class="n">ylabel</span><span class="o">=</span><span class="s1">&#39;Value&#39;</span><span class="p">)</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div></div>
+
+<div class="viewcode-block" id="UAVTrajectoryPlanner"><a class="viewcode-back" href="../../index.html#trajectory.optimal_time.UAVTrajectoryPlanner">[docs]</a><span class="k">class</span> <span class="nc">UAVTrajectoryPlanner</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    UAV Trajectory Planner using minimum snap optimization.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        waypoints (torch.Tensor): Waypoints of the trajectory.</span>
+<span class="sd">        total_time (float): Total time for the trajectory.</span>
+<span class="sd">        poly_order (int): Order of the polynomial.</span>
+<span class="sd">        start_vel (torch.Tensor): Starting velocity.</span>
+<span class="sd">        start_acc (torch.Tensor): Starting acceleration.</span>
+<span class="sd">        end_vel (torch.Tensor): Ending velocity.</span>
+<span class="sd">        end_acc (torch.Tensor): Ending acceleration.</span>
+<span class="sd">        dtype (torch.dtype): Data type for computations. Default is torch.float32.</span>
+<span class="sd">        device (str): Device for computations. Default is &#39;cpu&#39;.</span>
+
+<span class="sd">    Methods:</span>
+<span class="sd">        init_time_segments(waypoints, total_time):</span>
+<span class="sd">            Initializes time segments based on waypoint distances and total time.</span>
+<span class="sd">        evaluate_trajectory(T, plot_trajectory=False, iteration=None):</span>
+<span class="sd">            Evaluates the trajectory given the time segments.</span>
+<span class="sd">        evaluate_cost_function(polys_x, polys_y, T):</span>
+<span class="sd">            Evaluates the cost function for the given polynomial coefficients and time segments.</span>
+<span class="sd">        optimize_time_segments(waypoints, total_time):</span>
+<span class="sd">            Optimizes the time segments for the trajectory to minimize the cost.</span>
+<span class="sd">        solve_minimum_snap(waypoints, time_stamps, poly_order, start_vel, start_acc, end_vel, end_acc):</span>
+<span class="sd">            Solves the minimum snap problem to find polynomial coefficients for the trajectory.</span>
+<span class="sd">        forward(waypoints, total_time):</span>
+<span class="sd">            Main function to optimize the trajectory and solve for polynomial coefficients.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">waypoints</span><span class="p">,</span> <span class="n">total_time</span><span class="p">,</span> <span class="n">poly_order</span><span class="p">,</span> <span class="n">start_vel</span><span class="p">,</span> <span class="n">start_acc</span><span class="p">,</span> <span class="n">end_vel</span><span class="p">,</span> <span class="n">end_acc</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">UAVTrajectoryPlanner</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">waypoints</span> <span class="o">=</span> <span class="n">waypoints</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">total_time</span> <span class="o">=</span> <span class="n">total_time</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">poly_order</span> <span class="o">=</span> <span class="n">poly_order</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">start_vel</span> <span class="o">=</span> <span class="n">start_vel</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">start_acc</span> <span class="o">=</span> <span class="n">start_acc</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">end_vel</span> <span class="o">=</span> <span class="n">end_vel</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">end_acc</span> <span class="o">=</span> <span class="n">end_acc</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">dtype</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">device</span>
+
+<div class="viewcode-block" id="UAVTrajectoryPlanner.init_time_segments"><a class="viewcode-back" href="../../index.html#trajectory.optimal_time.UAVTrajectoryPlanner.init_time_segments">[docs]</a>    <span class="k">def</span> <span class="nf">init_time_segments</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">waypoints</span><span class="p">,</span> <span class="n">total_time</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes time segments based on waypoint distances and total time.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            waypoints (torch.Tensor): Waypoints of the trajectory.</span>
+<span class="sd">            total_time (float): Total time for the trajectory.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: A tensor of initialized time segments.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">differences</span> <span class="o">=</span> <span class="n">waypoints</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">:]</span> <span class="o">-</span> <span class="n">waypoints</span><span class="p">[:,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">distances</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">differences</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+        <span class="n">time_fraction</span> <span class="o">=</span> <span class="n">total_time</span> <span class="o">/</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">distances</span><span class="p">)</span>
+        <span class="n">arranged_time</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mi">0</span><span class="p">]),</span> <span class="n">torch</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">distances</span> <span class="o">*</span> <span class="n">time_fraction</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)])</span>
+        <span class="k">return</span> <span class="n">arranged_time</span></div>
+
+<div class="viewcode-block" id="UAVTrajectoryPlanner.evaluate_trajectory"><a class="viewcode-back" href="../../index.html#trajectory.optimal_time.UAVTrajectoryPlanner.evaluate_trajectory">[docs]</a>    <span class="k">def</span> <span class="nf">evaluate_trajectory</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">T</span><span class="p">,</span> <span class="n">plot_trajectory</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">iteration</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Evaluates the trajectory given the time segments, and optionally plots the trajectory.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            T (torch.Tensor): Time segments.</span>
+<span class="sd">            plot_trajectory (bool, optional): Whether to plot the trajectory.</span>
+<span class="sd">            iteration (int, optional): Current iteration number for optimization.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            float: The cost of the trajectory.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">polys_x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">solve_minimum_snap</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">waypoints</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">T</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">poly_order</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_vel</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_acc</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_vel</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_acc</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">polys_y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">solve_minimum_snap</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">waypoints</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">T</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">poly_order</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_vel</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_acc</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_vel</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_acc</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">polys_z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">solve_minimum_snap</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">waypoints</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">T</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">poly_order</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_vel</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_acc</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_vel</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_acc</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">plot_trajectory</span><span class="p">:</span>
+            <span class="n">TrajectoryPlotter</span><span class="o">.</span><span class="n">plot_trajectory</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">waypoints</span><span class="p">,</span> <span class="n">polys_x</span><span class="p">,</span> <span class="n">polys_y</span><span class="p">,</span><span class="n">polys_z</span><span class="p">,</span> <span class="n">T</span><span class="p">,</span> <span class="n">iteration</span><span class="o">=</span><span class="n">iteration</span><span class="p">,</span> <span class="n">clear_plot</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">flag</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">cost</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">evaluate_cost_function</span><span class="p">(</span><span class="n">polys_x</span><span class="p">,</span> <span class="n">polys_y</span><span class="p">,</span><span class="n">polys_z</span><span class="p">,</span> <span class="n">T</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">cost</span></div>
+
+<div class="viewcode-block" id="UAVTrajectoryPlanner.evaluate_cost_function"><a class="viewcode-back" href="../../index.html#trajectory.optimal_time.UAVTrajectoryPlanner.evaluate_cost_function">[docs]</a>    <span class="k">def</span> <span class="nf">evaluate_cost_function</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">polys_x</span><span class="p">,</span> <span class="n">polys_y</span><span class="p">,</span> <span class="n">polys_z</span><span class="p">,</span> <span class="n">T</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Evaluates the cost function for the given polynomial coefficients and time segments.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            polys_x (torch.Tensor): Polynomial coefficients for the x-coordinate.</span>
+<span class="sd">            polys_y (torch.Tensor): Polynomial coefficients for the y-coordinate.</span>
+<span class="sd">            polys_z (torch.Tensor): Polynomial coefficients for the z-coordinate.</span>
+<span class="sd">            T (torch.Tensor): Time segments.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            float: The total cost of the trajectory.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">total_cost</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">num_segments</span> <span class="o">=</span> <span class="n">polys_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">segment</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_segments</span><span class="p">):</span>
+            <span class="n">segment_duration</span> <span class="o">=</span> <span class="n">T</span><span class="p">[</span><span class="n">segment</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">T</span><span class="p">[</span><span class="n">segment</span><span class="p">]</span>
+            <span class="n">snap_x</span> <span class="o">=</span> <span class="n">polys_x</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="n">segment</span><span class="p">]</span>
+            <span class="n">snap_y</span> <span class="o">=</span> <span class="n">polys_y</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="n">segment</span><span class="p">]</span>
+            <span class="n">snap_z</span> <span class="o">=</span> <span class="n">polys_z</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="n">segment</span><span class="p">]</span>
+            <span class="n">segment_cost</span> <span class="o">=</span> <span class="p">(</span><span class="n">snap_x</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">snap_y</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">snap_z</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">segment_duration</span>
+            <span class="n">total_cost</span> <span class="o">+=</span> <span class="n">segment_cost</span>
+        <span class="k">return</span> <span class="n">total_cost</span></div>
+
+<div class="viewcode-block" id="UAVTrajectoryPlanner.optimize_time_segments"><a class="viewcode-back" href="../../index.html#trajectory.optimal_time.UAVTrajectoryPlanner.optimize_time_segments">[docs]</a>    <span class="k">def</span> <span class="nf">optimize_time_segments</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">waypoints</span><span class="p">,</span> <span class="n">total_time</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Optimizes the time segments for the trajectory to minimize the cost.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            waypoints (torch.Tensor): Waypoints of the trajectory.</span>
+<span class="sd">            total_time (float): Total time for the trajectory.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: Optimized time segments.</span>
+<span class="sd">            list: Loss history.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">T</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">init_time_segments</span><span class="p">(</span><span class="n">waypoints</span><span class="p">,</span> <span class="n">total_time</span><span class="p">)</span>
+        <span class="n">T</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">T</span><span class="p">)</span>
+
+        <span class="n">optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Adam</span><span class="p">([</span><span class="n">T</span><span class="p">],</span> <span class="n">lr</span><span class="o">=</span><span class="mf">2.0</span><span class="p">)</span>  <span class="c1"># Adjusted learning rate</span>
+        <span class="n">loss_history</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># Track loss history</span>
+        <span class="k">for</span> <span class="n">iteration</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>  <span class="c1"># Increased number of iterations</span>
+            <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+            <span class="n">loss</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">evaluate_trajectory</span><span class="p">(</span><span class="n">T</span><span class="p">,</span> <span class="n">plot_trajectory</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">iteration</span><span class="o">=</span><span class="n">iteration</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+            <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+            <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+                <span class="n">T</span><span class="o">.</span><span class="n">clamp_</span><span class="p">(</span><span class="nb">min</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+                <span class="n">T</span> <span class="o">/=</span> <span class="n">T</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+                <span class="n">T</span> <span class="o">*=</span> <span class="n">total_time</span>
+
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Iteration </span><span class="si">{</span><span class="n">iteration</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s1">, Loss: </span><span class="si">{</span><span class="n">loss</span><span class="o">.</span><span class="n">item</span><span class="p">()</span><span class="si">}</span><span class="s1">, Updated Times: </span><span class="si">{</span><span class="n">T</span><span class="o">.</span><span class="n">data</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="n">loss_history</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">loss</span><span class="o">.</span><span class="n">item</span><span class="p">())</span>  <span class="c1"># Store loss</span>
+        <span class="k">return</span> <span class="n">T</span><span class="p">,</span> <span class="n">loss_history</span></div>
+
+<div class="viewcode-block" id="UAVTrajectoryPlanner.solve_minimum_snap"><a class="viewcode-back" href="../../index.html#trajectory.optimal_time.UAVTrajectoryPlanner.solve_minimum_snap">[docs]</a>    <span class="k">def</span> <span class="nf">solve_minimum_snap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">waypoints</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">,</span> <span class="n">poly_order</span><span class="p">,</span> <span class="n">start_vel</span><span class="p">,</span> <span class="n">start_acc</span><span class="p">,</span> <span class="n">end_vel</span><span class="p">,</span> <span class="n">end_acc</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Solves the minimum snap problem to find polynomial coefficients for the trajectory.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            waypoints (torch.Tensor): Waypoints of the trajectory.</span>
+<span class="sd">            time_stamps (torch.Tensor): Time segments.</span>
+<span class="sd">            poly_order (int): Order of the polynomial.</span>
+<span class="sd">            start_vel (torch.Tensor): Starting velocity.</span>
+<span class="sd">            start_acc (torch.Tensor): Starting acceleration.</span>
+<span class="sd">            end_vel (torch.Tensor): Ending velocity.</span>
+<span class="sd">            end_acc (torch.Tensor): Ending acceleration.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: Polynomial coefficients for the trajectory.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">start_pos</span> <span class="o">=</span> <span class="n">waypoints</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">end_pos</span> <span class="o">=</span> <span class="n">waypoints</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">num_segments</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">waypoints</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="n">num_coefficients</span> <span class="o">=</span> <span class="n">poly_order</span> <span class="o">+</span> <span class="mi">1</span>
+
+        <span class="n">Q_all</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">block_diag</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">compute_Q_matrix</span><span class="p">(</span><span class="n">poly_order</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">time_stamps</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_segments</span><span class="p">)])</span>
+        <span class="n">b_all</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">Q_all</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="n">Aeq</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">4</span> <span class="o">*</span> <span class="n">num_segments</span> <span class="o">+</span> <span class="mi">2</span><span class="p">,</span> <span class="n">num_coefficients</span> <span class="o">*</span> <span class="n">num_segments</span><span class="p">)</span>
+        <span class="n">beq</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">4</span> <span class="o">*</span> <span class="n">num_segments</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">Aeq</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">,</span> <span class="p">:</span><span class="n">num_coefficients</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span>
+            <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">calculate_time_vector</span><span class="p">(</span><span class="n">time_stamps</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">poly_order</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">calculate_time_vector</span><span class="p">(</span><span class="n">time_stamps</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">poly_order</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">calculate_time_vector</span><span class="p">(</span><span class="n">time_stamps</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">poly_order</span><span class="p">,</span> <span class="mi">2</span><span class="p">)])</span>
+        <span class="n">Aeq</span><span class="p">[</span><span class="mi">3</span><span class="p">:</span><span class="mi">6</span><span class="p">,</span> <span class="o">-</span><span class="n">num_coefficients</span><span class="p">:]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span>
+            <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">calculate_time_vector</span><span class="p">(</span><span class="n">time_stamps</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">poly_order</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">calculate_time_vector</span><span class="p">(</span><span class="n">time_stamps</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">poly_order</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">calculate_time_vector</span><span class="p">(</span><span class="n">time_stamps</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">poly_order</span><span class="p">,</span> <span class="mi">2</span><span class="p">)])</span>
+        <span class="n">beq</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">6</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="n">start_pos</span><span class="p">,</span> <span class="n">start_vel</span><span class="p">,</span> <span class="n">start_acc</span><span class="p">,</span> <span class="n">end_pos</span><span class="p">,</span> <span class="n">end_vel</span><span class="p">,</span> <span class="n">end_acc</span><span class="p">])</span>
+
+        <span class="n">num_eq_constraints</span> <span class="o">=</span> <span class="mi">6</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_segments</span><span class="p">):</span>
+            <span class="n">Aeq</span><span class="p">[</span><span class="n">num_eq_constraints</span><span class="p">,</span> <span class="n">i</span> <span class="o">*</span> <span class="n">num_coefficients</span><span class="p">:(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">num_coefficients</span><span class="p">]</span> <span class="o">=</span> <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">calculate_time_vector</span><span class="p">(</span><span class="n">time_stamps</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">poly_order</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">beq</span><span class="p">[</span><span class="n">num_eq_constraints</span><span class="p">]</span> <span class="o">=</span> <span class="n">waypoints</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">num_eq_constraints</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_segments</span><span class="p">):</span>
+            <span class="n">time_vector_p</span> <span class="o">=</span> <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">calculate_time_vector</span><span class="p">(</span><span class="n">time_stamps</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">poly_order</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">time_vector_v</span> <span class="o">=</span> <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">calculate_time_vector</span><span class="p">(</span><span class="n">time_stamps</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">poly_order</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">time_vector_a</span> <span class="o">=</span> <span class="n">TrajectoryUtils</span><span class="o">.</span><span class="n">calculate_time_vector</span><span class="p">(</span><span class="n">time_stamps</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">poly_order</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+            <span class="n">Aeq</span><span class="p">[</span><span class="n">num_eq_constraints</span><span class="p">:</span><span class="n">num_eq_constraints</span> <span class="o">+</span> <span class="mi">3</span><span class="p">,</span> <span class="p">(</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">num_coefficients</span><span class="p">:(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">num_coefficients</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">time_vector_p</span><span class="p">,</span> <span class="o">-</span><span class="n">time_vector_p</span><span class="p">]),</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">time_vector_v</span><span class="p">,</span> <span class="o">-</span><span class="n">time_vector_v</span><span class="p">]),</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">time_vector_a</span><span class="p">,</span> <span class="o">-</span><span class="n">time_vector_a</span><span class="p">])])</span>
+            <span class="n">num_eq_constraints</span> <span class="o">+=</span> <span class="mi">3</span>
+
+        <span class="n">G_dummy</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">Q_all</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">Q_all</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="n">h_dummy</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">Q_all</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="n">Q_all</span> <span class="o">+=</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">Q_all</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span> <span class="o">*</span> <span class="mf">1e-6</span>
+        <span class="n">Q_all</span> <span class="o">=</span> <span class="n">Q_all</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">b_all</span> <span class="o">=</span> <span class="n">b_all</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">Aeq</span> <span class="o">=</span> <span class="n">Aeq</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">beq</span> <span class="o">=</span> <span class="n">beq</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">G_dummy</span> <span class="o">=</span> <span class="n">G_dummy</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">h_dummy</span> <span class="o">=</span> <span class="n">h_dummy</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+        <span class="n">solver_options</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;eps&#39;</span><span class="p">:</span> <span class="mf">1e-24</span><span class="p">,</span> <span class="s1">&#39;maxIter&#39;</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span> <span class="s1">&#39;solver&#39;</span><span class="p">:</span> <span class="n">qpth</span><span class="o">.</span><span class="n">qp</span><span class="o">.</span><span class="n">QPSolvers</span><span class="o">.</span><span class="n">PDIPM_BATCHED</span><span class="p">}</span>
+        <span class="n">solution</span> <span class="o">=</span> <span class="n">QPFunction</span><span class="p">(</span><span class="n">verbose</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="o">**</span><span class="n">solver_options</span><span class="p">)(</span><span class="n">Q_all</span><span class="p">,</span> <span class="n">b_all</span><span class="p">,</span> <span class="n">G_dummy</span><span class="p">,</span> <span class="n">h_dummy</span><span class="p">,</span> <span class="n">Aeq</span><span class="p">,</span> <span class="n">beq</span><span class="p">)</span>
+        <span class="n">polynomial_coefficients</span> <span class="o">=</span> <span class="n">solution</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">num_segments</span><span class="p">,</span> <span class="n">num_coefficients</span><span class="p">)</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">polynomial_coefficients</span></div>
+
+<div class="viewcode-block" id="UAVTrajectoryPlanner.forward"><a class="viewcode-back" href="../../index.html#trajectory.optimal_time.UAVTrajectoryPlanner.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">waypoints</span><span class="p">,</span> <span class="n">total_time</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Main function to optimize the trajectory and solve for polynomial coefficients.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            waypoints (torch.Tensor): Waypoints of the trajectory.</span>
+<span class="sd">            total_time (float): Total time for the trajectory.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: Polynomial coefficients for x coordinates.</span>
+<span class="sd">            torch.Tensor: Polynomial coefficients for y coordinates.</span>
+<span class="sd">            torch.Tensor: Polynomial coefficients for z coordinates.</span>
+<span class="sd">            torch.Tensor: Optimized time segments.</span>
+<span class="sd">            list: Loss history.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">optimized_time_segments</span><span class="p">,</span> <span class="n">loss_history</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">optimize_time_segments</span><span class="p">(</span><span class="n">waypoints</span><span class="p">,</span> <span class="n">total_time</span><span class="p">)</span>
+        <span class="n">polys_x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">solve_minimum_snap</span><span class="p">(</span><span class="n">waypoints</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">optimized_time_segments</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">poly_order</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_vel</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_acc</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_vel</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_acc</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">polys_y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">solve_minimum_snap</span><span class="p">(</span><span class="n">waypoints</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">optimized_time_segments</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">poly_order</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_vel</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_acc</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_vel</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_acc</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">polys_z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">solve_minimum_snap</span><span class="p">(</span><span class="n">waypoints</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">optimized_time_segments</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">poly_order</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_vel</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_acc</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_vel</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_acc</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">polys_x</span><span class="p">,</span> <span class="n">polys_y</span><span class="p">,</span> <span class="n">polys_z</span><span class="p">,</span> <span class="n">optimized_time_segments</span><span class="p">,</span> <span class="n">loss_history</span></div></div>
+
+<div class="viewcode-block" id="demo_minimum_snap_simple"><a class="viewcode-back" href="../../index.html#trajectory.optimal_time.demo_minimum_snap_simple">[docs]</a><span class="k">def</span> <span class="nf">demo_minimum_snap_simple</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Demonstration of the minimum snap trajectory planner.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">waypoints</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span><span class="o">.</span><span class="n">t</span><span class="p">()</span>
+    <span class="n">start_vel</span><span class="p">,</span> <span class="n">start_acc</span><span class="p">,</span> <span class="n">end_vel</span><span class="p">,</span> <span class="n">end_acc</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+    <span class="n">total_time</span> <span class="o">=</span> <span class="mf">25.0</span>
+    <span class="n">poly_order</span> <span class="o">=</span> <span class="mi">5</span>  <span class="c1"># Increased polynomial order</span>
+
+    <span class="n">planner</span> <span class="o">=</span> <span class="n">UAVTrajectoryPlanner</span><span class="p">(</span><span class="n">waypoints</span><span class="p">,</span> <span class="n">total_time</span><span class="p">,</span> <span class="n">poly_order</span><span class="p">,</span> <span class="n">start_vel</span><span class="p">,</span> <span class="n">start_acc</span><span class="p">,</span> <span class="n">end_vel</span><span class="p">,</span> <span class="n">end_acc</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span><span class="p">)</span>
+    <span class="n">polys_x</span><span class="p">,</span> <span class="n">polys_y</span><span class="p">,</span> <span class="n">polys_z</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">,</span> <span class="n">loss_history</span> <span class="o">=</span> <span class="n">planner</span><span class="p">(</span><span class="n">waypoints</span><span class="p">,</span> <span class="n">total_time</span><span class="p">)</span>
+    <span class="n">TrajectoryPlotter</span><span class="o">.</span><span class="n">plot_trajectory</span><span class="p">(</span><span class="n">waypoints</span><span class="p">,</span> <span class="n">polys_x</span><span class="p">,</span> <span class="n">polys_y</span><span class="p">,</span> <span class="n">polys_z</span><span class="p">,</span> <span class="n">time_stamps</span><span class="p">,</span> <span class="n">clear_plot</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">flag</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># Plot the loss history</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">loss_history</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="n">loss_history</span><span class="p">,</span> <span class="n">marker</span><span class="o">=</span><span class="s1">&#39;o&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;b&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">&quot;Total Cost Over Iterations&quot;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Iteration&quot;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Cost&quot;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">demo_minimum_snap_simple</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">minimum snap</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2024, harsh.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.1.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

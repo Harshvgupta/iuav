@@ -1,0 +1,27 @@
+[OPTIONS]
+Binary TOC=No
+Binary Index=No
+Compiled file=minimumsnapdoc.chm
+Contents file=minimumsnapdoc.hhc
+Default Window=minimumsnapdoc
+Default topic=index.html
+Display compile progress=No
+Full text search stop list file=minimumsnapdoc.stp
+Full-text search=Yes
+Index file=minimumsnapdoc.hhk
+Language=0x409
+Title=minimum snap 0.0.1 documentation
+
+[WINDOWS]
+minimumsnapdoc="minimum snap 0.0.1 documentation","minimumsnapdoc.hhc","minimumsnapdoc.hhk","index.html","index.html",,,,,0x63520,220,0x10384e,[0,0,1024,768],,,,,,,0
+
+[FILES]
+genindex.html
+index.html
+_static\alabaster.css
+_static\basic.css
+_static\custom.css
+_static\file.png
+_static\minus.png
+_static\plus.png
+_static\pygments.css
